@@ -1,6 +1,4 @@
-// Backend Server for ESP32 Device Management
-// Run with: node server.js
-
+// server.js
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -11,103 +9,158 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// In-memory storage (replace with database in production)
-const devices = new Map();
+// Storage
+const devices = new Map();    // deviceId -> { deviceId, name, ws, ... }
 const sessions = new Map();
-const webClients = new Set();
+const webClients = new Set(); // Set of WebSocket connections from dashboards
 
-// WebSocket connection handler
+// Helper: broadcast to all web clients (text)
+function broadcastToWebClients(data) {
+  const txt = JSON.stringify(data);
+  for (const client of webClients) {
+    if (client.readyState === WebSocket.OPEN) client.send(txt);
+  }
+}
+
+// WebSocket handler (single server, we route by pathname)
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname;
 
   if (path === '/ws/devices') {
-    // Web client connection for monitoring devices
-    console.log('Web client connected');
+    // Web dashboard client
+    console.log('Web dashboard connected');
     webClients.add(ws);
 
-    // Send current device list to newly connected client
-    ws.send(JSON.stringify({
-      type: 'devices_list',
-      devices: Array.from(devices.values())
+    // send current device list
+    const deviceList = Array.from(devices.values()).map(d => ({
+      deviceId: d.deviceId, name: d.name, firmwareVersion: d.firmwareVersion,
+      capabilities: d.capabilities, publicIp: d.publicIp,
+      lastSeen: d.lastSeen, status: d.status, samplingRate: d.samplingRate,
+      cameraResolution: d.cameraResolution, compressionEnabled: d.compressionEnabled,
+      otaEnabled: d.otaEnabled
     }));
+    ws.send(JSON.stringify({ type: 'devices_list', devices: deviceList }));
+
+    ws.on('message', (msg) => {
+      // We expect JSON text messages from the dashboard
+      try {
+        const data = JSON.parse(msg);
+        // 1) Send binary to device: { type: 'binary_cmd', target: '<deviceId>', payloadHex: '0A01' }
+        if (data.type === 'binary_cmd' && data.target && data.payloadHex) {
+          const device = devices.get(data.target);
+          if (!device || !device.ws || device.ws.readyState !== WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Device not connected' }));
+            return;
+          }
+          // parse hex string -> Buffer
+          let hex = data.payloadHex.replace(/[^0-9a-fA-F]/g, '');
+          if (hex.length % 2 !== 0) hex = '0' + hex; // pad if odd
+          const buf = Buffer.from(hex, 'hex');
+          device.ws.send(buf);
+          ws.send(JSON.stringify({ type: 'binary_sent', target: data.target, bytes: buf.length }));
+          return;
+        }
+
+        // 2) High-level relay (optional): { type: 'relay', target, message }
+        if (data.type === 'relay' && data.target && data.message) {
+          const device = devices.get(data.target);
+          if (device && device.ws && device.ws.readyState === WebSocket.OPEN) {
+            device.ws.send(JSON.stringify(data.message));
+            ws.send(JSON.stringify({ type: 'relayed', target: data.target }));
+          } else {
+            ws.send(JSON.stringify({ type: 'error', message: 'Device not connected' }));
+          }
+          return;
+        }
+
+        // 3) other dashboard messages you might add...
+      } catch (err) {
+        console.error('Invalid dashboard message', err);
+      }
+    });
 
     ws.on('close', () => {
-      console.log('Web client disconnected');
       webClients.delete(ws);
+      console.log('Web dashboard disconnected');
     });
+
+    ws.on('error', (err) => {
+      console.error('Web dashboard ws error:', err);
+    });
+
   } else if (path === '/ws/esp32') {
     // ESP32 device connection
-    let deviceId = null;
-    let deviceInfo = null;
-
     console.log('ESP32 attempting to connect...');
+    let deviceId = null;
 
     ws.on('message', (message) => {
-      try {
-        const data = JSON.parse(message);
+      // message may be Buffer (binary) or string (text)
+      if (typeof message === 'string') {
+        try {
+          const data = JSON.parse(message);
+          // registration
+          if (data.type === 'register') {
+            deviceId = data.deviceId || uuidv4();
+            const deviceInfo = {
+              deviceId,
+              name: data.name || `ESP-${deviceId.slice(0, 8)}`,
+              firmwareVersion: data.firmwareVersion || '1.0.0',
+              capabilities: data.capabilities || [],
+              publicIp: req.socket.remoteAddress,
+              lastSeen: new Date().toISOString(),
+              status: 'online',
+              samplingRate: data.samplingRate || 1000,
+              cameraResolution: data.cameraResolution,
+              compressionEnabled: data.compressionEnabled,
+              otaEnabled: data.otaEnabled,
+              ws
+            };
+            devices.set(deviceId, deviceInfo);
+            console.log(`Device registered: ${deviceId}`);
 
-        // Handle device registration
-        if (data.type === 'register') {
-        deviceId = data.deviceId || uuidv4();
-        deviceInfo = {
-          deviceId,
-          name: data.name || `ESP32-${deviceId.slice(0, 8)}`,
-          firmwareVersion: data.firmwareVersion || '1.0.0',
-          capabilities: data.capabilities || [],
-          publicIp: req.socket.remoteAddress,
-          lastSeen: new Date().toISOString(),
-          status: 'online',
-          samplingRate: data.samplingRate || 1000,
-          cameraResolution: data.cameraResolution,
-          compressionEnabled: data.compressionEnabled,
-          otaEnabled: data.otaEnabled
-        };
+            // ack to device
+            ws.send(JSON.stringify({ type: 'registration_ack', deviceId, status: 'success' }));
 
-        devices.set(deviceId, { ...deviceInfo, ws });
-        console.log(`Device registered: ${deviceId}`);
-
-        ws.send(JSON.stringify({
-          type: 'registration_ack',
-          deviceId,
-          status: 'success'
-        }));
-
-        broadcastToWebClients({
-          type: 'device_registered',
-          device: deviceInfo
-        });
-      }
-
-
-        // Handle heartbeat/status updates
-        else if (data.type === 'heartbeat') {
-          if (deviceId && devices.has(deviceId)) {
-            const device = devices.get(deviceId);
-            device.lastSeen = new Date().toISOString();
-            devices.set(deviceId, device);
+            // notify dashboards
+            broadcastToWebClients({ type: 'device_registered', device: deviceInfo });
+            return;
+          } else if (data.type === 'heartbeat') {
+            if (deviceId && devices.has(deviceId)) {
+              const d = devices.get(deviceId);
+              d.lastSeen = new Date().toISOString();
+              devices.set(deviceId, d);
+              // optionally notify dashboards with heartbeat
+              broadcastToWebClients({ type: 'device_heartbeat', deviceId, lastSeen: d.lastSeen });
+            }
+            return;
+          } else if (data.type === 'sensor_frame') {
+            // sensor_frame text (if device sends as JSON instead of binary)
+            broadcastToWebClients({ type: 'sensor_frame', deviceId, frame: data });
+            return;
+          } else if (data.type === 'ai_log') {
+            broadcastToWebClients({ type: 'ai_log', deviceId, event: data.event });
+            return;
+          } else {
+            // other text messages
+            broadcastToWebClients({ type: 'device_message', deviceId, payload: data });
+            return;
           }
+        } catch (err) {
+          console.error('Error parsing text message from device', err);
+          return;
         }
-
-        // Handle sensor data frames (for active sessions)
-        else if (data.type === 'sensor_frame') {
-          console.log(`Received sensor frame from ${deviceId}`);
-          // Process and store frame data
-          // In production, this would go to object storage (S3)
-          handleSensorFrame(deviceId, data);
-        }
-
-        // Handle AI log events
-        else if (data.type === 'ai_log') {
-          console.log(`AI event from ${deviceId}:`, data.event);
-          handleAILog(deviceId, data);
-        }
-      } catch (error) {
-        console.error('Error processing ESP32 message:', error);
+      } else if (Buffer.isBuffer(message)) {
+        // binary frames: could be sensor data or other binary protocols
+        const hex = message.toString('hex');
+        // broadcast to dashboards with tag that binary was received
+        broadcastToWebClients({ type: 'device_binary', deviceId, hex, length: message.length });
+        // Also store/process in handleSensorFrame if you want:
+        console.log(`Received binary (${message.length}) from ${deviceId}: ${hex.slice(0, 80)}${hex.length > 80 ? '...' : ''}`);
+        return;
       }
     });
 
@@ -115,50 +168,22 @@ wss.on('connection', (ws, req) => {
       if (deviceId) {
         console.log(`Device disconnected: ${deviceId}`);
         devices.delete(deviceId);
-
-        // Notify web clients about device disconnect
-        broadcastToWebClients({
-          type: 'device_disconnected',
-          deviceId
-        });
+        broadcastToWebClients({ type: 'device_disconnected', deviceId });
       }
     });
 
-    ws.on('error', (error) => {
-      console.error('ESP32 WebSocket error:', error);
+    ws.on('error', (err) => {
+      console.error('ESP32 WebSocket error:', err);
     });
+
+  } else {
+    // Unknown path — close politely
+    console.log('Unknown WS path:', path);
+    ws.close();
   }
 });
 
-// Helper function to broadcast to web clients
-function broadcastToWebClients(data) {
-  const message = JSON.stringify(data);
-  webClients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
-    }
-  });
-}
-
-// Handle sensor frame data
-function handleSensorFrame(deviceId, data) {
-  // In production: 
-  // 1. Validate frame checksum
-  // 2. Store to object storage (S3/MinIO)
-  // 3. Update frame registry in database
-  // 4. Check for missing frames and mark in retransmit queue
-  console.log(`Storing frame ${data.frameId} from ${deviceId}`);
-}
-
-// Handle AI log events
-function handleAILog(deviceId, data) {
-  // Store AI logs to database
-  console.log(`AI Log: Device ${deviceId} - Event: ${data.event}`);
-}
-
-// REST API Endpoints
-
-// Get all devices for a user
+// REST endpoints (kept from your original server)
 app.get('/api/devices', (req, res) => {
   const deviceList = Array.from(devices.values()).map(d => ({
     deviceId: d.deviceId,
@@ -176,49 +201,22 @@ app.get('/api/devices', (req, res) => {
   res.json({ devices: deviceList });
 });
 
-// Register/update device (called by ESP32 or portal)
-app.post('/api/devices/:deviceId/register', (req, res) => {
-  const { deviceId } = req.params;
-  const deviceData = req.body;
-
-  if (devices.has(deviceId)) {
-    const device = devices.get(deviceId);
-    Object.assign(device, deviceData);
-    devices.set(deviceId, device);
-  } else {
-    devices.set(deviceId, {
-      ...deviceData,
-      deviceId,
-      lastSeen: new Date().toISOString(),
-      status: 'offline'
-    });
-  }
-
-  res.json({ success: true, deviceId });
-});
-
-// Update device configuration
+// Update device configuration (kept)
 app.put('/api/devices/:deviceId/configure', (req, res) => {
   const { deviceId } = req.params;
   const config = req.body;
-
-  if (!devices.has(deviceId)) {
-    return res.status(404).json({ error: 'Device not found' });
-  }
+  if (!devices.has(deviceId)) return res.status(404).json({ error: 'Device not found' });
 
   const device = devices.get(deviceId);
-  
-  // Update device configuration
   device.name = config.deviceName || device.name;
   device.samplingRate = config.samplingRate || device.samplingRate;
   device.capabilities = config.capabilities || device.capabilities;
   device.cameraResolution = config.cameraResolution;
   device.compressionEnabled = config.compressionEnabled;
   device.otaEnabled = config.otaEnabled;
-
   devices.set(deviceId, device);
 
-  // Send configuration update to ESP32 via WebSocket
+  // send config update to device
   if (device.ws && device.ws.readyState === WebSocket.OPEN) {
     device.ws.send(JSON.stringify({
       type: 'config_update',
@@ -233,264 +231,45 @@ app.put('/api/devices/:deviceId/configure', (req, res) => {
     }));
   }
 
-  res.json({ success: true, device: {
-    deviceId: device.deviceId,
-    name: device.name,
-    capabilities: device.capabilities
-  }});
+  res.json({ success: true, device: { deviceId: device.deviceId, name: device.name, capabilities: device.capabilities }});
 });
 
-// Get device capabilities
-app.put('/api/devices/:deviceId/capabilities', (req, res) => {
+// Send binary command via REST (optional): payloadHex string
+app.post('/api/devices/:deviceId/send-binary', (req, res) => {
   const { deviceId } = req.params;
-  const { capabilities } = req.body;
-
-  if (!devices.has(deviceId)) {
-    return res.status(404).json({ error: 'Device not found' });
-  }
-
+  const { payloadHex } = req.body;
+  if (!devices.has(deviceId)) return res.status(404).json({ error: 'Device not found' });
   const device = devices.get(deviceId);
-  device.capabilities = capabilities;
-  devices.set(deviceId, device);
+  if (!device.ws || device.ws.readyState !== WebSocket.OPEN) return res.status(503).json({ error: 'Device offline' });
 
-  res.json({ success: true });
-});
-
-// Create new session
-app.post('/api/sessions', (req, res) => {
-  const { name, nodes, sensors, keySetId, duration, retentionPolicy } = req.body;
-  
-  const sessionId = uuidv4();
-  const session = {
-    sessionId,
-    name,
-    nodes,
-    sensors,
-    keySetId,
-    startTime: new Date().toISOString(),
-    duration,
-    retentionPolicy,
-    status: 'active',
-    sessionToken: uuidv4()
-  };
-
-  sessions.set(sessionId, session);
-
-  // Notify selected ESP32 nodes about new session
-  nodes.forEach(nodeId => {
-    if (devices.has(nodeId)) {
-      const device = devices.get(nodeId);
-      if (device.ws && device.ws.readyState === WebSocket.OPEN) {
-        device.ws.send(JSON.stringify({
-          type: 'session_start',
-          sessionId,
-          sessionToken: session.sessionToken,
-          sensors,
-          duration
-        }));
-      }
-    }
-  });
-
-  res.json({ success: true, session });
-});
-
-// Get session details
-app.get('/api/sessions/:sessionId', (req, res) => {
-  const { sessionId } = req.params;
-  
-  if (!sessions.has(sessionId)) {
-    return res.status(404).json({ error: 'Session not found' });
-  }
-
-  res.json({ session: sessions.get(sessionId) });
-});
-
-// Start session
-app.post('/api/sessions/:sessionId/start', (req, res) => {
-  const { sessionId } = req.params;
-  
-  if (!sessions.has(sessionId)) {
-    return res.status(404).json({ error: 'Session not found' });
-  }
-
-  const session = sessions.get(sessionId);
-  session.status = 'active';
-  session.startTime = new Date().toISOString();
-  sessions.set(sessionId, session);
-
-  res.json({ success: true, session });
-});
-
-// Stop session
-app.post('/api/sessions/:sessionId/stop', (req, res) => {
-  const { sessionId } = req.params;
-  
-  if (!sessions.has(sessionId)) {
-    return res.status(404).json({ error: 'Session not found' });
-  }
-
-  const session = sessions.get(sessionId);
-  session.status = 'stopped';
-  session.endTime = new Date().toISOString();
-  sessions.set(sessionId, session);
-
-  // Notify ESP32 nodes to stop acquisition
-  session.nodes.forEach(nodeId => {
-    if (devices.has(nodeId)) {
-      const device = devices.get(nodeId);
-      if (device.ws && device.ws.readyState === WebSocket.OPEN) {
-        device.ws.send(JSON.stringify({
-          type: 'session_stop',
-          sessionId
-        }));
-      }
-    }
-  });
-
-  res.json({ success: true, session });
-});
-
-// Get all sessions
-app.get('/api/sessions', (req, res) => {
-  const sessionList = Array.from(sessions.values());
-  res.json({ sessions: sessionList });
-});
-
-// Upload public keys for PUF encryption
-app.post('/api/users/:userId/keysets', (req, res) => {
-  const { userId } = req.params;
-  const { publicKeys } = req.body;
-  
-  const keySetId = uuidv4();
-  // In production: store in database
-  console.log(`Registered key set ${keySetId} for user ${userId}`);
-  
-  res.json({ success: true, keySetId, keysCount: publicKeys.length });
-});
-
-// Get keyset info
-app.get('/api/keysets/:keySetId', (req, res) => {
-  const { keySetId } = req.params;
-  // In production: fetch from database
-  res.json({ keySetId, status: 'active' });
-});
-
-// Get frames for a session
-app.get('/api/sessions/:sessionId/frames', (req, res) => {
-  const { sessionId } = req.params;
-  const { node, sensor, from, to } = req.query;
-  
-  // In production: query object storage (S3) for frames
-  // Filter by node, sensor, time range
-  res.json({
-    frames: [],
-    message: 'Frame retrieval not yet implemented'
-  });
-});
-
-// Request frame download
-app.post('/api/sessions/:sessionId/download-request', (req, res) => {
-  const { sessionId } = req.params;
-  const { frameIds, timeRange } = req.body;
-  
-  // In production: generate pre-signed URLs for S3 objects
-  const downloadUrls = frameIds?.map(id => ({
-    frameId: id,
-    url: `https://storage.example.com/frames/${id}`,
-    expiresAt: new Date(Date.now() + 3600000).toISOString()
-  })) || [];
-  
-  res.json({ downloadUrls });
-});
-
-// Send actuator command
-app.post('/api/nodes/:nodeId/actuators/:actuatorId/command', (req, res) => {
-  const { nodeId, actuatorId } = req.params;
-  const { value, nonce } = req.body;
-  
-  if (!devices.has(nodeId)) {
-    return res.status(404).json({ error: 'Device not found' });
-  }
-
-  const device = devices.get(nodeId);
-  const commandId = uuidv4();
-  
-  if (device.ws && device.ws.readyState === WebSocket.OPEN) {
-    device.ws.send(JSON.stringify({
-      type: 'actuator_command',
-      commandId,
-      actuatorId,
-      value,
-      nonce
-    }));
-    
-    res.json({ 
-      success: true, 
-      commandId,
-      status: 'sent',
-      message: 'Command sent to device'
-    });
-  } else {
-    res.status(503).json({ 
-      error: 'Device offline',
-      message: 'Cannot send command to offline device'
-    });
+  try {
+    let hex = (payloadHex || '').replace(/[^0-9a-fA-F]/g, '');
+    if (hex.length % 2 !== 0) hex = '0' + hex;
+    const buf = Buffer.from(hex, 'hex');
+    device.ws.send(buf);
+    return res.json({ success: true, sentBytes: buf.length });
+  } catch (err) {
+    console.error('Error sending binary via REST', err);
+    return res.status(400).json({ error: 'Invalid payloadHex' });
   }
 });
 
-// Get actuator status
-app.get('/api/nodes/:nodeId/actuators/:actuatorId/status', (req, res) => {
-  const { nodeId, actuatorId } = req.params;
-  
-  // In production: fetch from database
-  res.json({
-    actuatorId,
-    nodeId,
-    lastCommand: null,
-    status: 'unknown'
-  });
-});
-
-// Get user activity logs
-app.get('/api/users/:userId/activity', (req, res) => {
-  const { userId } = req.params;
-  const { from, to } = req.query;
-  
-  // In production: query activity log database
-  res.json({
-    activities: [],
-    message: 'Activity log retrieval not yet implemented'
-  });
-});
-
-// Health check endpoint
+// health route
 app.get('/health', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     connectedDevices: devices.size,
-    activeSessions: sessions.size,
     webClients: webClients.size
   });
 });
 
-// Start server
 const PORT = process.env.PORT || 8080;
-const HOST = "0.0.0.0"; // 👈 allow all network interfaces
+const HOST = "0.0.0.0";
 
 server.listen(PORT, HOST, () => {
-  console.log(`✓ Server running on http://${HOST}:${PORT}`);
-  console.log(`✓ WebSocket endpoints:`);
-  console.log(`  - ws://<your-lan-ip>:${PORT}/ws/esp32 (for ESP32 devices)`);
-  console.log(`  - ws://<your-lan-ip>:${PORT}/ws/devices (for web clients)`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, closing server...');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
+  console.log(`Server running on http://${HOST}:${PORT}`);
+  console.log(`WebSocket endpoints:`);
+  console.log(` - ws://<your-lan-ip>:${PORT}/ws/esp32 (for ESP32 devices)`);
+  console.log(` - ws://<your-lan-ip>:${PORT}/ws/devices (for web dashboards)`);
 });
