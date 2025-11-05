@@ -233,11 +233,7 @@ app.put('/api/devices/:deviceId/configure', (req, res) => {
     }));
   }
 
-  res.json({ success: true, device: {
-    deviceId: device.deviceId,
-    name: device.name,
-    capabilities: device.capabilities
-  }});
+  res.json({ success: true, device });
 });
 
 // Get device capabilities
