@@ -1,4 +1,4 @@
-// Backend Server for ESP8266 Device Management
+// Backend Server for ESP32 Device Management
 // Run with: node server.js
 
 const express = require('express');
@@ -51,10 +51,10 @@ wss.on('connection', (ws, req) => {
   }
 
   // ------------------------
-  // ESP8266 Device Connection
+  // ESP32 Device Connection
   // ------------------------
-  else if (path === '/ws/esp8266') {
-    console.log('🔌 ESP8266 attempting connection...');
+  else if (path === '/ws/esp32') {
+    console.log('🔌 ESP32 attempting connection...');
     let deviceId = null;
 
     ws.on('message', (msg) => {
@@ -67,7 +67,7 @@ wss.on('connection', (ws, req) => {
 
           const deviceInfo = {
             deviceId,
-            name: data.name || `ESP8266-${deviceId.slice(0, 8)}`,
+            name: data.name || `ESP32-${deviceId.slice(0, 8)}`,
             firmwareVersion: data.firmwareVersion || '1.0.0',
             capabilities: data.capabilities || [],
             publicIp: req.socket.remoteAddress,
@@ -130,7 +130,7 @@ wss.on('connection', (ws, req) => {
         }
 
       } catch (err) {
-        console.error('❌ Error parsing ESP8266 message:', err.message);
+        console.error('❌ Error parsing ESP32 message:', err.message);
       }
     });
 
@@ -151,7 +151,7 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('error', (err) => {
-      console.error('⚠️ ESP8266 WebSocket error:', err.message);
+      console.error('⚠️ ESP32 WebSocket error:', err.message);
     });
   }
 });
@@ -233,7 +233,7 @@ const HOST = '0.0.0.0';
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Server running at http://${HOST}:${PORT}`);
   console.log(`📡 WebSocket endpoints:`);
-  console.log(`  - ws://<your-lan-ip>:${PORT}/ws/esp8266`);
+  console.log(`  - ws://<your-lan-ip>:${PORT}/ws/esp32`);
   console.log(`  - ws://<your-lan-ip>:${PORT}/ws/devices`);
 });
 
