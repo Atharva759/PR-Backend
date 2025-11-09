@@ -28,7 +28,7 @@ wss.on('connection', (ws, req) => {
   const path = url.pathname;
 
   if (path === '/ws/devices') {
-    console.log('✅ Web client connected');
+    console.log(' Web client connected');
     webClients.add(ws);
 
     // Send current device list
@@ -45,7 +45,7 @@ wss.on('connection', (ws, req) => {
     }));
 
     ws.on('close', () => {
-      console.log('❌ Web client disconnected');
+      console.log(' Web client disconnected');
       webClients.delete(ws);
     });
   }
@@ -54,7 +54,7 @@ wss.on('connection', (ws, req) => {
   // ESP32 Device Connection
   // ------------------------
   else if (path === '/ws/esp32') {
-    console.log('🔌 ESP32 attempting connection...');
+    console.log(' ESP32 attempting connection...');
     let deviceId = null;
 
     ws.on('message', (msg) => {
@@ -108,12 +108,13 @@ wss.on('connection', (ws, req) => {
 
           // Broadcast heartbeat summary to web clients
           broadcastToWebClients({
-            type: 'device_heartbeat',
+            type: 'heartbeat',
             deviceId,
-            uptime: data.uptime,
-            rssi: data.rssi,
+            uptime_ms: data.uptime_ms,
+            wifi_rssi: data.wifi_rssi,
+            sensors: data.sensors,      //  forward full sensor list
             summary: data.summary,
-            timestamp: data.timestamp
+            timestamp: Date.now()
           });
         }
 
@@ -130,13 +131,13 @@ wss.on('connection', (ws, req) => {
         }
 
       } catch (err) {
-        console.error('❌ Error parsing ESP32 message:', err.message);
+        console.error(' Error parsing ESP32 message:', err.message);
       }
     });
 
     ws.on('close', () => {
       if (deviceId) {
-        console.log(`⚠️ Device disconnected: ${deviceId}`);
+        console.log(` Device disconnected: ${deviceId}`);
         if (devices.has(deviceId)) {
           const device = devices.get(deviceId);
           device.status = 'offline';
@@ -151,7 +152,7 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('error', (err) => {
-      console.error('⚠️ ESP32 WebSocket error:', err.message);
+      console.error('ESP32 WebSocket error:', err.message);
     });
   }
 });
@@ -169,7 +170,7 @@ function broadcastToWebClients(data) {
 }
 
 function handleAILog(deviceId, data) {
-  console.log(`🤖 AI Log from ${deviceId}:`, data.event || 'No event');
+  console.log(` AI Log from ${deviceId}:`, data.event || 'No event');
 }
 
 // -------------------
@@ -231,17 +232,17 @@ const PORT = process.env.PORT || 8080;
 const HOST = '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running at http://${HOST}:${PORT}`);
-  console.log(`📡 WebSocket endpoints:`);
+  console.log(` Server running at http://${HOST}:${PORT}`);
+  console.log(` WebSocket endpoints:`);
   console.log(`  - ws://<your-lan-ip>:${PORT}/ws/esp32`);
   console.log(`  - ws://<your-lan-ip>:${PORT}/ws/devices`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received, closing server...');
+  console.log(' SIGTERM received, closing server...');
   server.close(() => {
-    console.log('✅ Server closed');
+    console.log(' Server closed');
     process.exit(0);
   });
 });
