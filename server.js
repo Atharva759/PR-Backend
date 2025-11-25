@@ -1,6 +1,7 @@
 // Backend Server for ESP32 Device Management
 // Run with: node server.js
-require('dotenv').config();
+//require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
