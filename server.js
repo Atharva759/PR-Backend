@@ -35,7 +35,7 @@ wss.on('connection', (ws, req) => {
   const path = url.pathname;
 
   if (path === '/ws/devices') {
-    console.log(' Web client connected');
+    log(' Web client connected');
     webClients.add(ws);
 
     // Send current device list
@@ -52,7 +52,7 @@ wss.on('connection', (ws, req) => {
     }));
 
     ws.on('close', () => {
-      console.log(' Web client disconnected');
+      log(' Web client disconnected');
       webClients.delete(ws);
     });
   }
@@ -61,7 +61,7 @@ wss.on('connection', (ws, req) => {
   // ESP32 Device Connection
   // ------------------------
   else if (path === '/ws/esp32') {
-    console.log(' ESP32 attempting connection...');
+    log('ESP32 attempting connection...');
     let deviceId = null;
 
     ws.on('message', async(msg) => {
@@ -88,7 +88,7 @@ wss.on('connection', (ws, req) => {
           };
 
           devices.set(deviceId, deviceInfo);
-          console.log(`✅ Device registered: ${deviceId}`);
+          log(`Device registered: ${deviceId}`);
 
           ws.send(JSON.stringify({
             type: 'registration_ack',
@@ -126,9 +126,9 @@ wss.on('connection', (ws, req) => {
                     voltage_v,current_a,power_w,energy_wh,frequency_hz
                   ]
               );
-              console.log("PZEM Data inserted into DB");
+              log("PZEM Data inserted into DB");
             }catch(err){
-              console.error("DB error",err.message);
+              log("DB error",err.message);
             }
           }
 
@@ -146,24 +146,24 @@ wss.on('connection', (ws, req) => {
 
         // -------- Configuration Updates --------
         else if (data.type === 'config_update_ack') {
-          console.log(` ${deviceId} acknowledged config update.`);
+          log(` ${deviceId} acknowledged config update.`);
         }
 
         // -------- Session or AI Events --------
         else if (data.type === 'session_start_ack') {
-          console.log(` ${deviceId} started session: ${data.sessionId}`);
+          log(` ${deviceId} started session: ${data.sessionId}`);
         } else if (data.type === 'ai_log') {
           handleAILog(deviceId, data);
         }
 
       } catch (err) {
-        console.error(' Error parsing ESP32 message:', err.message);
+        log('Error parsing ESP32 message:', err.message);
       }
     });
 
     ws.on('close', () => {
       if (deviceId) {
-        console.log(` Device disconnected: ${deviceId}`);
+        console.log(`Device disconnected: ${deviceId}`);
         if (devices.has(deviceId)) {
           const device = devices.get(deviceId);
           device.status = 'offline';
@@ -178,7 +178,7 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('error', (err) => {
-      console.error('ESP32 WebSocket error:', err.message);
+      log('ESP32 WebSocket error:', err.message);
     });
   }
 });
@@ -262,7 +262,7 @@ app.get("/api/pzem/latest", async (req, res) => {
 
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
-    console.error("DB fetch error:", err.message);
+    log("DB fetch error:", err.message);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -275,9 +275,24 @@ app.get("/api/pzem/history", async (req, res) => {
 
     res.json({ success: true, history: result.rows });
   } catch (err) {
-    console.error("DB fetch error:", err.message);
+    log("DB fetch error:", err.message);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// Logs
+let logs = [];
+
+function log(...args) {
+  const message = args.join(" ");
+  console.log(message);          // still prints normally
+  logs.push({ message, time: Date.now() });
+
+  if (logs.length > 500) logs.shift(); // prevent memory overflow
+}
+
+app.get("/logs", (req, res) => {
+  res.json(logs);
 });
 
 
@@ -288,17 +303,17 @@ const PORT = process.env.PORT || 8080;
 const HOST = '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(` Server running at http://${HOST}:${PORT}`);
-  console.log(` WebSocket endpoints:`);
-  console.log(`  - ws://<your-lan-ip>:${PORT}/ws/esp32`);
-  console.log(`  - ws://<your-lan-ip>:${PORT}/ws/devices`);
+  log(` Server running at http://${HOST}:${PORT}`);
+  log(` WebSocket endpoints:`);
+  log(`  - ws://<your-lan-ip>:${PORT}/ws/esp32`);
+  log(`  - ws://<your-lan-ip>:${PORT}/ws/devices`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log(' SIGTERM received, closing server...');
+  log(' SIGTERM received, closing server...');
   server.close(() => {
-    console.log(' Server closed');
+    log(' Server closed');
     process.exit(0);
   });
 });
