@@ -126,30 +126,30 @@ wss.on('connection', (ws, req) => {
                     voltage_v,current_a,power_w,energy_wh,frequency_hz
                   ]
               );
-              log("PZEM Data inserted into DB");
+              //log("PZEM Data inserted into DB");
             }catch(err){
               log("DB error",err.message);
             }
           }
 
-          // Broadcast heartbeat summary to web clients
+          
           broadcastToWebClients({
             type: 'heartbeat',
             deviceId,
             uptime_ms: data.uptime_ms,
             wifi_rssi: data.wifi_rssi,
-            sensors: data.sensors,      //  forward full sensor list
+            sensors: data.sensors,      
             summary: data.summary,
             timestamp: Date.now()
           });
         }
 
-        // -------- Configuration Updates --------
+        
         else if (data.type === 'config_update_ack') {
           log(` ${deviceId} acknowledged config update.`);
         }
 
-        // -------- Session or AI Events --------
+        
         else if (data.type === 'session_start_ack') {
           log(` ${deviceId} started session: ${data.sessionId}`);
         } else if (data.type === 'ai_log') {
@@ -183,9 +183,9 @@ wss.on('connection', (ws, req) => {
   }
 });
 
-// -------------------
+
 // Helper Functions
-// -------------------
+
 function broadcastToWebClients(data) {
   const msg = JSON.stringify(data);
   webClients.forEach(client => {
@@ -303,10 +303,12 @@ const PORT = process.env.PORT || 8080;
 const HOST = '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  log(` Server running at http://${HOST}:${PORT}`);
+  log(`Backend Server running at http://${HOST}:${PORT}`);
+  /*
   log(` WebSocket endpoints:`);
   log(`  - ws://<your-lan-ip>:${PORT}/ws/esp32`);
   log(`  - ws://<your-lan-ip>:${PORT}/ws/devices`);
+  */
 });
 
 // Graceful shutdown
