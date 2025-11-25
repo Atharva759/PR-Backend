@@ -1,15 +1,21 @@
 // Backend Server for ESP32 Device Management
 // Run with: node server.js
-
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const { Pool } = require('pg');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+const pool = new Pool({
+  connectionString:process.env.DATABASE_URL,
+  ssl:{rejectUnauthorized:false}
+});
 
 // Middleware
 app.use(cors());
@@ -57,7 +63,7 @@ wss.on('connection', (ws, req) => {
     console.log(' ESP32 attempting connection...');
     let deviceId = null;
 
-    ws.on('message', (msg) => {
+    ws.on('message', async(msg) => {
       try {
         const data = JSON.parse(msg);
 
@@ -106,6 +112,25 @@ wss.on('connection', (ws, req) => {
           device.status = 'online';
           devices.set(deviceId, device);
 
+          // SQL DB 
+          const pzemSensor = data.sensors.find(s=>s.id==="pzem004t");
+          if(pzemSensor && pzemSensor.data){
+            const {voltage_v, current_a,power_w,energy_wh,frequency_hz} = pzemSensor.data;
+
+            try{
+              await pool.query(
+                  `INSERT INTO pzem_data (voltage,current,power,energy,frequency)
+                  VALUES ($1,$2,$3,$4,$5)`,
+                  [
+                    voltage_v,current_a,power_w,energy_wh,frequency_hz
+                  ]
+              );
+              console.log("PZEM Data inserted into DB");
+            }catch(err){
+              console.error("DB error",err.message);
+            }
+          }
+
           // Broadcast heartbeat summary to web clients
           broadcastToWebClients({
             type: 'heartbeat',
@@ -120,12 +145,12 @@ wss.on('connection', (ws, req) => {
 
         // -------- Configuration Updates --------
         else if (data.type === 'config_update_ack') {
-          console.log(`✅ ${deviceId} acknowledged config update.`);
+          console.log(` ${deviceId} acknowledged config update.`);
         }
 
         // -------- Session or AI Events --------
         else if (data.type === 'session_start_ack') {
-          console.log(`🎬 ${deviceId} started session: ${data.sessionId}`);
+          console.log(` ${deviceId} started session: ${data.sessionId}`);
         } else if (data.type === 'ai_log') {
           handleAILog(deviceId, data);
         }
@@ -169,9 +194,7 @@ function broadcastToWebClients(data) {
   });
 }
 
-function handleAILog(deviceId, data) {
-  console.log(` AI Log from ${deviceId}:`, data.event || 'No event');
-}
+
 
 // -------------------
 // REST API Endpoints
@@ -224,6 +247,38 @@ app.get('/health', (req, res) => {
     webClients: webClients.size
   });
 });
+
+// db data
+app.get("/api/pzem/latest", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM pzem_data ORDER BY timestamp DESC LIMIT 1`
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "No sensor data found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error("DB fetch error:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.get("/api/pzem/history", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM pzem_data ORDER BY timestamp ASC`
+    );
+
+    res.json({ success: true, history: result.rows });
+  } catch (err) {
+    console.error("DB fetch error:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 
 // -------------------
 // Start Server
