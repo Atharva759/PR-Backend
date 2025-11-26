@@ -17,6 +17,7 @@ model = joblib.load(MODEL_PATH)
 
 # FastAPI app
 app = FastAPI(title="Energy Prediction API")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,3 +52,9 @@ def predict(data: SensorData):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+# Add this at the bottom
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))  # Use Render's PORT or default to 8000
+    uvicorn.run("ml.service.ml_service:app", host="0.0.0.0", port=port, reload=True)    
