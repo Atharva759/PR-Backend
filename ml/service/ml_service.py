@@ -4,6 +4,7 @@ import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 MODEL_PATH = os.getenv("MODEL_PATH", "ml/models/demand_model.pkl")
 FEATURE_COLUMNS = ["voltage", "current", "power", "frequency"]  # Same as training features
@@ -16,7 +17,13 @@ model = joblib.load(MODEL_PATH)
 
 # FastAPI app
 app = FastAPI(title="Energy Prediction API")
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Request model
 class SensorData(BaseModel):
