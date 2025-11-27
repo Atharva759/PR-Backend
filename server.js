@@ -280,6 +280,19 @@ app.get("/api/pzem/history", async (req, res) => {
   }
 });
 
+app.get("/api/pzem/history/last50", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM pzem_data ORDER BY timestamp DESC LIMIT 50`
+    );
+
+    res.json({ success: true, history: result.rows.reverse() });
+  } catch (err) {
+    log("DB fetch error:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Logs
 let logs = [];
 
