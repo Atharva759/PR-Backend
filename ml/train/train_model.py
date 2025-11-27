@@ -25,7 +25,7 @@ def load_data():
 
 
 def train():
-    print("📥 Loading data from Neon PostgreSQL...")
+    print("Loading data from Neon PostgreSQL...")
     df = load_data()
 
     # Ensure required columns exist
@@ -40,8 +40,8 @@ def train():
     X = df[FEATURE_COLUMNS]
     y = df[TARGET_COLUMN]
 
-    print(f"🔢 Training on {len(X)} samples with features: {FEATURE_COLUMNS}")
-    print(f"🎯 Target column: {TARGET_COLUMN}")
+    print(f"Training on {len(X)} samples with features: {FEATURE_COLUMNS}")
+    print(f" Target column: {TARGET_COLUMN}")
 
     # Train/Test split
     X_train, X_test, y_train, y_test = train_test_split(
@@ -60,7 +60,7 @@ def train():
     joblib.dump(model, MODEL_PATH)
     print(f"💾 Model saved to: {MODEL_PATH}")
 
-    print("✅ Training complete!")
+    print("Training complete!")
 
 
 if __name__ == "__main__":
