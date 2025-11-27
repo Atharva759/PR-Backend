@@ -5,15 +5,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from ml.db import get_engine
 
-# ---------------------------
 # CONFIG
-# ---------------------------
+
 MODEL_DIR = "ml/models"
 MODEL_PATH = os.path.join(MODEL_DIR, "demand_model.pkl")
 
 FEATURE_COLUMNS = ["voltage", "current", "power", "frequency"]  # Keep features relevant
 TARGET_COLUMN = "energy"   # Now predicting energy
-# ---------------------------
 
 
 # Load data from Neon PostgreSQL
@@ -58,7 +56,7 @@ def train():
 
     # Save model
     joblib.dump(model, MODEL_PATH)
-    print(f"💾 Model saved to: {MODEL_PATH}")
+    print(f" Model saved to: {MODEL_PATH}")
 
     print("Training complete!")
 
