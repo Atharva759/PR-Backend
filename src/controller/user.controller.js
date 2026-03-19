@@ -1,9 +1,9 @@
-const admin = require("firebase-admin");
-const { db } = require("../config/firebase");
+
+import { db ,admin} from "../config/firebase.js";
 
 
 // GET ALL USERS (SUPER ADMIN)
-async function getAllUsers(req, res) {
+export async function getAllUsers(req, res) {
   try {
 
     if (req.user.role !== "super_admin") {
@@ -30,10 +30,10 @@ async function getAllUsers(req, res) {
 
 
 // GET USERS BY TENANT
-async function getUsersByTenant(req, res) {
+export async function getUsersByTenant(req, res) {
   try {
-
-    if (req.user.role !== "super_admin") {
+    
+    if (req.user.role !== "super_admin" && req.user.role!=="tenant_admin") {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -63,7 +63,7 @@ async function getUsersByTenant(req, res) {
 
 
 // CHANGE USER ROLE
-async function updateUserRole(req, res) {
+export async function updateUserRole(req, res) {
   try {
 
     if (req.user.role !== "super_admin") {
@@ -90,10 +90,10 @@ async function updateUserRole(req, res) {
 
 
 // UPDATE EMAIL
-async function updateUserEmail(req, res) {
+export async function updateUserEmail(req, res) {
   try {
 
-    if (req.user.role !== "super_admin") {
+    if (req.user.role !== "super_admin" && req.user.role!=="tenant_admin") {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -113,10 +113,10 @@ async function updateUserEmail(req, res) {
 
 
 // DELETE USER
-async function deleteUser(req, res) {
+export async function deleteUser(req, res) {
   try {
 
-    if (req.user.role !== "super_admin") {
+    if (req.user.role !== "super_admin" && req.user.role!=="tenant_admin") {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -133,13 +133,34 @@ async function deleteUser(req, res) {
   }
 }
 
-module.exports = {
-  getAllUsers,
-  getUsersByTenant,
-  updateUserRole,
-  updateUserEmail,
-  deleteUser
-};
+export async function setRoles(req,res){
+  try {
+      const { uid } = req.body;
+      const snapshot = await db
+        .ref(`/users/${uid}`)
+        .once("value");
+  
+      const userData = snapshot.val();
+  
+      if (!userData) {
+        return res.status(404).json({ error: "User not found" });
+      }
+  
+      const { role, tenantId } = userData;
+  
+      await admin.auth().setCustomUserClaims(uid, {
+        role,
+        tenantId,
+      });
+  
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to set claims" });
+    }
+}
+
+
 
 /*
 GET /api/users	List all users

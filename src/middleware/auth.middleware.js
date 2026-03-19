@@ -1,6 +1,6 @@
-const { admin } = require("../config/firebase");
+import { admin } from "../config/firebase.js";
 
-async function verifyToken(req, res, next) {
+export async function verifyToken(req, res, next) {
   try {
     const token = req.headers.authorization?.split("Bearer ")[1];
     if (!token) return res.status(401).json({ error: "No token provided" });
@@ -10,8 +10,10 @@ async function verifyToken(req, res, next) {
 
     next();
   } catch (err) {
+    console.log(err);
     return res.status(401).json({ error: "Unauthorized" });
   }
 }
 
-module.exports = verifyToken;
+
+

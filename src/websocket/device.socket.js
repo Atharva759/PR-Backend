@@ -1,7 +1,7 @@
-const { getDeviceByMac } = require("../services/device.service");
-const { insertSensorData } = require("../services/sensor.service");
+import { getDeviceByMac } from"../services/device.service.js";
+import { insertSensorData } from "../services/sensor.service.js";
 
-function handleESPMessage(wss) {
+export async function handleESPMessage(wss) {
 
   wss.on("connection", (ws, req) => {
 
@@ -52,4 +52,4 @@ function handleESPMessage(wss) {
   });
 }
 
-module.exports = { handleESPMessage };
+export default handleESPMessage;

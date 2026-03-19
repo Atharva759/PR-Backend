@@ -1,16 +1,18 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
 
-const verifyToken = require("../middleware/auth.middleware");
+import {verifyToken} from "../middleware/auth.middleware.js";
 
-const {
+import {
   getAllUsers,
   getUsersByTenant,
   updateUserRole,
   updateUserEmail,
-  deleteUser
-} = require("../controller/user.controller");
+  deleteUser,
+  setRoles
+} from "../controller/user.controller.js";
 
+router.post("/auth/setClaims",setRoles)
 
 router.get("/", verifyToken, getAllUsers);
 
@@ -22,7 +24,7 @@ router.patch("/:uid/email", verifyToken, updateUserEmail);
 
 router.delete("/:uid", verifyToken, deleteUser);
 
-module.exports = router;
+export default router;
 
 /*
 GET /api/users	List all users

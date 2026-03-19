@@ -1,8 +1,8 @@
-const express = require("express");
-const verifyToken = require("../middleware/auth.middleware");
-const requireRole = require("../middleware/rbac.middleware");
-const { db } = require("../config/firebase");
-const { getDeviceSensorData } = require("../controller/sensor.controller");
+import express from "express";
+import {verifyToken} from "../middleware/auth.middleware.js";
+import requireRole from "../middleware/rbac.middleware.js";
+import { db } from "../config/firebase.js";
+import { getDeviceSensorData } from "../controller/sensor.controller.js";
 
 const router = express.Router();
 
@@ -29,16 +29,16 @@ router.post(
   }
 );
 
-const {
+import {
   getAllDevices,
   getTenantDevices,
   getDeviceById,
   updateDevice,
   deleteDevice
-} = require("../controller/device.controller");
+} from "../controller/device.controller.js";
 
 
-router.get("/", verifyToken, getAllDevices);
+router.get("/all", verifyToken, getAllDevices); // super admin
 
 
 router.get("/:deviceId", verifyToken, getDeviceById);
@@ -60,4 +60,4 @@ PATCH /api/devices/:deviceId	Update device name
 DELETE /api/devices/:deviceId	Delete device
 */
 
-module.exports = router;
+export default router;

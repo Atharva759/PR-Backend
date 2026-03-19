@@ -1,6 +1,5 @@
-const { db } = require("../config/firebase");
-
-async function insertSensorData(tenantId, sensorType, mac, data) {
+import { db } from "../config/firebase.js";
+export async function insertSensorData(tenantId, sensorType, mac, data) {
 
   const timestamp = Date.now();
 
@@ -11,4 +10,3 @@ async function insertSensorData(tenantId, sensorType, mac, data) {
   await ref.set(data);
 }
 
-module.exports = { insertSensorData };

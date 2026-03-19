@@ -1,8 +1,7 @@
-const { db } = require("../config/firebase");
-
+import { db } from "../config/firebase.js";
 
 // GET ALL DEVICES (SUPER ADMIN)
-async function getAllDevices(req, res) {
+export async function getAllDevices(req, res) {
   try {
 
     if (req.user.role !== "super_admin") {
@@ -29,7 +28,7 @@ async function getAllDevices(req, res) {
 
 
 // GET DEVICES BY TENANT
-async function getTenantDevices(req, res) {
+export async function getTenantDevices(req, res) {
   try {
 
     const tenantId = req.user.tenantId;
@@ -58,7 +57,7 @@ async function getTenantDevices(req, res) {
 
 
 // GET SINGLE DEVICE
-async function getDeviceById(req, res) {
+export async function getDeviceById(req, res) {
   try {
 
     const { deviceId } = req.params;
@@ -78,7 +77,7 @@ async function getDeviceById(req, res) {
 
 
 // UPDATE DEVICE NAME
-async function updateDevice(req, res) {
+export async function updateDevice(req, res) {
   try {
 
     const { deviceId } = req.params;
@@ -95,7 +94,7 @@ async function updateDevice(req, res) {
 
 
 // DELETE DEVICE
-async function deleteDevice(req, res) {
+export async function deleteDevice(req, res) {
   try {
 
     const { deviceId } = req.params;
@@ -109,10 +108,3 @@ async function deleteDevice(req, res) {
   }
 }
 
-module.exports = {
-  getAllDevices,
-  getTenantDevices,
-  getDeviceById,
-  updateDevice,
-  deleteDevice
-};

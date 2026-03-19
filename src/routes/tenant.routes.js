@@ -1,11 +1,11 @@
-const express = require("express");
-const verifyToken = require("../middleware/auth.middleware");
-const requireRole = require("../middleware/rbac.middleware");
-const { db } = require("../config/firebase");
-const { inviteTenantAdmin } = require("../controller/tenant.controller");
+import express from "express";
+import {verifyToken} from"../middleware/auth.middleware.js";
+import requireRole from"../middleware/rbac.middleware.js";
+import { db } from "../config/firebase.js";
+import { inviteTenantAdmin,updateTenant,deleteTenant,getTenantDevices,removeDeviceFromTenant,assignDeviceToTenant } from "../controller/tenant.controller.js";
 
 const router = express.Router();
-
+// Create a new tenant
 router.post(
   "/create",
   verifyToken,
@@ -23,7 +23,27 @@ router.post(
   }
 );
 
+router.patch(
+  "/:tenantId",
+  verifyToken,
+  requireRole(["super_admin"]),
+  updateTenant
+);
+
+router.delete(
+  "/:tenantId",
+  verifyToken,
+  requireRole(["super_admin"]),
+  deleteTenant
+);
+
+router.get("/:tenantId/devices", verifyToken, getTenantDevices);
+
+router.post("/:tenantId/devices/assign", verifyToken, assignDeviceToTenant);
+
+router.delete("/:tenantId/devices/:deviceId", verifyToken, removeDeviceFromTenant);
+
 // Invite Tenant Admin Through Super Admin (FrontEnd - /api/tenants/invite-admin (pass parameters accordingly))
 router.post("/invite-admin", verifyToken, inviteTenantAdmin);
 
-module.exports = router;
+export default router;
