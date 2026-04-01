@@ -1,4 +1,4 @@
-import { admin } from "../config/firebase.js";
+import { admin,db } from "../config/firebase.js";
 
 export async function verifyToken(req, res, next) {
   try {
