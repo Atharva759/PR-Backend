@@ -13,9 +13,9 @@ router.post(
   requireRole(["tenant_admin"]),
   async (req, res) => {
 
-    const { mac, name } = req.body;
+    const { mac, name,facilityId } = req.body;
     const tenantId = req.user.tenantId;
-    const facilityId = req.user.facilityId;
+    
 
     const ref = db.ref("devices_registry").push();
 
