@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-
+import requireRole from "../middleware/rbac.middleware.js";
 import {verifyToken} from "../middleware/auth.middleware.js";
 
 import {
@@ -9,7 +9,9 @@ import {
   updateUserRole,
   updateUserEmail,
   deleteUser,
-  setRoles
+  setRoles,
+  createSuperAdmin,
+  createTenantAdmin
 } from "../controller/user.controller.js";
 
 router.post("/auth/setClaims",setRoles)
@@ -24,7 +26,10 @@ router.patch("/:uid/email", verifyToken, updateUserEmail);
 
 router.delete("/:uid", verifyToken, deleteUser);
 
-export default router;
+router.post("/create-super-admin", createSuperAdmin);
+
+router.post("/create-tenant-admin", createTenantAdmin);
+
 
 /*
 GET /api/users	List all users
@@ -33,3 +38,11 @@ PATCH /api/users/:uid/role	Change role
 PATCH /api/users/:uid/email	Update email
 DELETE /api/users/:uid	Delete user
 */
+
+// NEW FACILITY
+import {assignFacilityRole} from "../controller/user.controller.js";
+router.post("/assign-role", verifyToken, requireRole("tenant_admin"), assignFacilityRole);
+
+
+
+export default router;

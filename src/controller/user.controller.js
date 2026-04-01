@@ -160,6 +160,76 @@ export async function setRoles(req,res){
     }
 }
 
+// Create Super Admin
+export const createSuperAdmin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await admin.auth().createUser({
+      email,
+      password,
+    });
+
+    await admin.auth().setCustomUserClaims(user.uid, {
+      role: "super_admin",
+    });
+
+    await admin.database().ref(`users/${user.uid}`).set({
+      email,
+      role: "super_admin",
+      createdAt: Date.now(),
+    });
+
+    return res.status(201).json({
+      message: "Super Admin created",
+      uid: user.uid,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message,
+    });
+  }
+};
+
+// Create Tenant Admin
+export const createTenantAdmin = async (req, res) => {
+  try {
+    const { email, password, tenantId } = req.body;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        error: "tenantId is required",
+      });
+    }
+
+    const user = await admin.auth().createUser({
+      email,
+      password,
+    });
+
+    await admin.auth().setCustomUserClaims(user.uid, {
+      role: "tenant_admin",
+      tenantId,
+    });
+
+    await admin.database().ref(`users/${user.uid}`).set({
+      email,
+      role: "tenant_admin",
+      tenantId,
+      createdAt: Date.now(),
+    });
+
+    return res.status(201).json({
+      message: "Tenant Admin created",
+      uid: user.uid,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message,
+    });
+  }
+};
+
 
 
 /*
@@ -167,5 +237,19 @@ GET /api/users	List all users
 GET /api/users/:tenantId	List users by tenant
 PATCH /api/users/:uid/role	Change role
 PATCH /api/users/:uid/email	Update email
-DELETE /api/users/:uid	Delete user
+DELETE /api/users/:uid	Delete user 
+POST /api/users/create-tenant-admin 
+POST /api/users/create-super-admin 
 */
+
+// NEW FACILITY 
+import * as userService from "../services/user.service.js";
+
+export const assignFacilityRole = async (req, res) => {
+  try {
+    const result = await userService.assignFacilityRole(req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

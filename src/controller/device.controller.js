@@ -1,4 +1,5 @@
 import { db } from "../config/firebase.js";
+import * as deviceService from "../services/device.service.js";
 
 // GET ALL DEVICES (SUPER ADMIN)
 export async function getAllDevices(req, res) {
@@ -108,3 +109,21 @@ export async function deleteDevice(req, res) {
   }
 }
 
+// FACILITY FUNCTIONS
+export const addDevice = async (req, res) => {
+  try {
+    const device = await deviceService.addDevice(req.user, req.body);
+    res.json(device);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const getDevices = async (req, res) => {
+  try {
+    const devices = await deviceService.getDevices(req.user);
+    res.json(devices);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

@@ -60,4 +60,11 @@ PATCH /api/devices/:deviceId	Update device name
 DELETE /api/devices/:deviceId	Delete device
 */
 
+
+import { addDevice,getDevices } from "../controller/device.controller.js";
+
+// NEW FACILITY DEVICE ADD API
+router.post("/", verifyToken, requireRole("facility_admin"), addDevice);
+router.get("/", verifyToken, getDevices);
+
 export default router;

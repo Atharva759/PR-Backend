@@ -11,7 +11,7 @@ import deviceRoutes from"./routes/device.routes.js";
 import tenantRoutes from "./routes/tenant.routes.js";
 import userRoutes from"./routes/user.routes.js";
 import monitorRoutes from "./routes/monitor.routes.js";
-
+import facilityRoutes from "./routes/facility.routes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +21,7 @@ const wss = new WebSocketServer({ server });
 app.use(cors());
 app.use(express.json());
 
+app.use("/api/facilities",facilityRoutes);
 app.use("/api/devices", deviceRoutes);
 app.use("/api/tenants", tenantRoutes);
 app.use("/api/users", userRoutes);
