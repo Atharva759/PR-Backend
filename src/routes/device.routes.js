@@ -15,14 +15,15 @@ router.post(
 
     const { mac, name } = req.body;
     const tenantId = req.user.tenantId;
-    
+    const facilityId = req.user.facilityId;
 
     const ref = db.ref("devices_registry").push();
 
     await ref.set({
       mac,
       name,
-      tenantId
+      tenantId,
+      facilityId
     });
 
     res.json({ success: true });
