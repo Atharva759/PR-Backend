@@ -194,7 +194,7 @@ export const createSuperAdmin = async (req, res) => {
 // Create Tenant Admin
 export const createTenantAdmin = async (req, res) => {
   try {
-    const { email, password, tenantId } = req.body;
+    const { email, password, tenantId ,role } = req.body;
 
     if (!tenantId) {
       return res.status(400).json({
@@ -208,19 +208,19 @@ export const createTenantAdmin = async (req, res) => {
     });
 
     await admin.auth().setCustomUserClaims(user.uid, {
-      role: "tenant_admin",
+      role: role,
       tenantId,
     });
 
     await admin.database().ref(`users/${user.uid}`).set({
       email,
-      role: "tenant_admin",
+      role: role,
       tenantId,
       createdAt: Date.now(),
     });
 
     return res.status(201).json({
-      message: "Tenant Admin created",
+      message: "User created",
       uid: user.uid,
     });
   } catch (err) {
