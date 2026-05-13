@@ -32,7 +32,7 @@ export async function inviteTenantAdmin(req, res) {
 }
 
 
-export async function getTenantDevices(req, res)  {
+export async function getTenantDevices(req, res) {
   try {
 
     const { tenantId } = req.params;
@@ -139,7 +139,12 @@ export async function getAllTenants(req, res) {
 
     const tenantsObj = snapshot.val();
 
-    const tenants = Object.values(tenantsObj);
+    const tenants = Object.entries(tenantsObj).map(
+      ([id, value]) => ({
+        id,
+        ...value
+      })
+    );
 
     res.status(200).json({
       success: true,
