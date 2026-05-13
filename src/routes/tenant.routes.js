@@ -2,7 +2,7 @@ import express from "express";
 import {verifyToken} from"../middleware/auth.middleware.js";
 import requireRole from"../middleware/rbac.middleware.js";
 import { db } from "../config/firebase.js";
-import { inviteTenantAdmin,updateTenant,deleteTenant,getTenantDevices,removeDeviceFromTenant,assignDeviceToTenant } from "../controller/tenant.controller.js";
+import { inviteTenantAdmin,updateTenant,deleteTenant,getTenantDevices,removeDeviceFromTenant,assignDeviceToTenant,getAllTenants,getTenantById } from "../controller/tenant.controller.js";
 
 const router = express.Router();
 // Create a new tenant
@@ -23,19 +23,6 @@ router.post(
   }
 );
 
-router.patch(
-  "/:tenantId",
-  verifyToken,
-  requireRole(["super_admin"]),
-  updateTenant
-);
-
-router.delete(
-  "/:tenantId",
-  verifyToken,
-  requireRole(["super_admin"]),
-  deleteTenant
-);
 
 router.get("/:tenantId/devices", verifyToken, getTenantDevices);
 
