@@ -46,4 +46,35 @@ router.delete("/:tenantId/devices/:deviceId", verifyToken, removeDeviceFromTenan
 // Invite Tenant Admin Through Super Admin (FrontEnd - /api/tenants/invite-admin (pass parameters accordingly))
 router.post("/invite-admin", verifyToken, inviteTenantAdmin);
 
+
+// GET ALL TENANTS
+router.get(
+  "/",
+  verifyToken,
+  getAllTenants
+);
+
+// GET SINGLE TENANT
+router.get(
+  "/:tenantId",
+  verifyToken,
+  getTenantById
+);
+
+// UPDATE TENANT
+router.patch(
+  "/:tenantId",
+  verifyToken,
+  requireRole(["super_admin"]),
+  updateTenant
+);
+
+// DELETE TENANT
+router.delete(
+  "/:tenantId",
+  verifyToken,
+  requireRole(["super_admin"]),
+  deleteTenant
+);
+
 export default router;

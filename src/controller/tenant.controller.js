@@ -31,64 +31,6 @@ export async function inviteTenantAdmin(req, res) {
   }
 }
 
-// UPDATE TENANT
-export async function updateTenant(req, res) {
-  try {
-
-    if (req.user.role !== "super_admin") {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    const { tenantId } = req.params;
-    const { name } = req.body;
-
-    const ref = db.ref(`tenants/${tenantId}`);
-
-    const snapshot = await ref.once("value");
-
-    if (!snapshot.exists()) {
-      return res.status(404).json({ message: "Tenant not found" });
-    }
-
-    await ref.update({
-      name
-    });
-
-    res.json({ message: "Tenant updated successfully" });
-
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
-
-
-
-// DELETE TENANT
-export async function deleteTenant(req, res) {
-  try {
-
-    if (req.user.role !== "super_admin") {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    const { tenantId } = req.params;
-
-    const ref = db.ref(`tenants/${tenantId}`);
-
-    const snapshot = await ref.once("value");
-
-    if (!snapshot.exists()) {
-      return res.status(404).json({ message: "Tenant not found" });
-    }
-
-    await ref.remove();
-
-    res.json({ message: "Tenant deleted successfully" });
-
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-}
 
 export async function getTenantDevices(req, res)  {
   try {
@@ -175,3 +117,180 @@ export const removeDeviceFromTenant = async (req, res) => {
 };
 
 // Frontend call - sendPasswordResetEmail(auth, email) 
+
+// ==========================================
+// GET ALL TENANTS
+// ==========================================
+export async function getAllTenants(req, res) {
+
+  try {
+
+    const snapshot = await db.ref("tenants").once("value");
+
+    if (!snapshot.exists()) {
+
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+
+    }
+
+    const tenantsObj = snapshot.val();
+
+    const tenants = Object.values(tenantsObj);
+
+    res.status(200).json({
+      success: true,
+      count: tenants.length,
+      data: tenants
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+
+  }
+
+}
+
+
+
+// ==========================================
+// GET SINGLE TENANT
+// ==========================================
+export async function getTenantById(req, res) {
+
+  try {
+
+    const { tenantId } = req.params;
+
+    const snapshot = await db
+      .ref(`tenants/${tenantId}`)
+      .once("value");
+
+    if (!snapshot.exists()) {
+
+      return res.status(404).json({
+        message: "Tenant not found"
+      });
+
+    }
+
+    res.json(snapshot.val());
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      message: err.message
+    });
+
+  }
+
+}
+// ==========================================
+// UPDATE TENANT
+// ==========================================
+export async function updateTenant(req, res) {
+
+  try {
+
+    if (req.user.role !== "super_admin") {
+      return res.status(403).json({
+        message: "Forbidden"
+      });
+    }
+
+    const { tenantId } = req.params;
+
+    const { name, sensors } = req.body;
+
+    const ref = db.ref(`tenants/${tenantId}`);
+
+    const snapshot = await ref.once("value");
+
+    if (!snapshot.exists()) {
+
+      return res.status(404).json({
+        message: "Tenant not found"
+      });
+
+    }
+
+    const updateData = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (sensors !== undefined) updateData.sensors = sensors;
+
+    await ref.update(updateData);
+
+    res.json({
+      message: "Tenant updated successfully"
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      message: err.message
+    });
+
+  }
+
+}
+
+
+
+// ==========================================
+// DELETE TENANT
+// ==========================================
+export async function deleteTenant(req, res) {
+
+  try {
+
+    if (req.user.role !== "super_admin") {
+      return res.status(403).json({
+        message: "Forbidden"
+      });
+    }
+
+    const { tenantId } = req.params;
+
+    const ref = db.ref(`tenants/${tenantId}`);
+
+    const snapshot = await ref.once("value");
+
+    if (!snapshot.exists()) {
+
+      return res.status(404).json({
+        message: "Tenant not found"
+      });
+
+    }
+
+    await ref.remove();
+
+    res.json({
+      message: "Tenant deleted successfully"
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      message: err.message
+    });
+
+  }
+
+}
